@@ -4,8 +4,6 @@
 # License: GPL
 
 import numpy as np
-import scipy as sp
-import sys
 import matplotlib.pyplot as plt
 
 from matplotlib.patches import Ellipse, Circle, Rectangle, Polygon
@@ -437,13 +435,13 @@ class Domain():
                 * (self.image_blue == c[2])
         self.wall_id = np.where(self.wall_mask > 0)
         # Compute wall distances: wall = "wall_colors" pixels
-        if (self.wall_id[0].size > 0):
+        if self.wall_id[0].size > 0:
             self.compute_wall_distance()
         else:
-            print("WARNING: Failed to compute wall distance!")
-            print("WARNING: Wall colors are ", self.wall_colors)
-            print("WARNING: Check that there are pixels with these colors!")
-            sys.exit()
+            raise RuntimeError(
+                f"No wall pixels found for colors {self.wall_colors}. "
+                "Check that the background image contains pixels with these colors."
+            )
 
     def compute_wall_distance(self):
         """To compute the geodesic distance to the walls in using
@@ -531,10 +529,9 @@ class Domain():
         norm = (norm > 0)*norm + (norm == 0)*0.001
         dest.desired_velocity_X = grad_X/norm
         dest.desired_velocity_Y = grad_Y/norm
-        try:
-            self.destinations[dest.name] = dest
-        except:
-            self.destinations = {dest.name: dest}
+        if self.destinations is None:
+            self.destinations = {}
+        self.destinations[dest.name] = dest
 
     def people_desired_velocity(self, xyr, people_dest, II=None, JJ=None):
         """This function determines people desired velocities from the desired \
@@ -651,14 +648,10 @@ class Domain():
         ax1 = fig.add_subplot(111)
         ax1.imshow(self.image, interpolation='nearest', extent=[self.xmin, self.xmax,
                    self.ymin, self.ymax], origin='lower')
-        # plt.savefig('.png',dpi=dpi)
-        # ax1.axes.get_xaxis().set_visible(False)
-        # ax1.axes.get_xaxis().set_visible(False)
         ax1.set_axis_off()
         ax1.set_title(title)
-        # fig.add_axes(ax1)
         plt.draw()
-        if (savefig):
+        if savefig:
             fig.savefig(filename, dpi=dpi, bbox_inches='tight', pad_inches=0)
 
     def plot_wall_dist(self,
@@ -693,9 +686,8 @@ class Domain():
                    scale=scale, scale_units=scale_units)
         ax1.set_axis_off()
         ax1.set_title(title)
-        # plt.savefig('.png',dpi=dpi)
         plt.draw()
-        if (savefig):
+        if savefig:
             fig.savefig(filename, dpi=dpi, bbox_inches='tight', pad_inches=0)
 
     def plot_desired_velocity(self,
@@ -736,10 +728,9 @@ class Domain():
                    self.destinations[destination_name].desired_velocity_Y[::step, ::step],
                    scale=scale, scale_units=scale_units)
         ax1.set_title(title)
-        # plt.savefig('.png',dpi=dpi)
         ax1.set_axis_off()
         plt.draw()
-        if (savefig):
+        if savefig:
             fig.savefig(filename, dpi=dpi, bbox_inches='tight', pad_inches=0)
 
     def __str__(self):

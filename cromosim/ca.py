@@ -50,15 +50,8 @@ def plot_people_according_to_current_door_distance(ifig, people, domain,
     ax1.set_xticks([])
     ax1.set_yticks([])
     ax1.axis('off')
-    # ax1.set_xlabel('x',color='white')
-    # ax1.set_ylabel('y',color='white')
-    # ax1.set_title('t',color='white')
-    # ax1.spines['left'].set_color('white')
-    # ax1.spines['right'].set_color('white')
-    # ax1.spines['bottom'].set_color('white')
-    # ax1.spines['top'].set_color('white')
     fig.canvas.draw()
-    if (savefig):
+    if savefig:
         fig.savefig(filename, dpi=150, bbox_inches='tight', pad_inches=0)
     plt.pause(0.01)
 
@@ -110,16 +103,9 @@ def plot_people_according_to_initial_door_distance(ifig, people, domain, results
         ax1.set_ylim(axis[2], axis[3])
     ax1.set_xticks([])
     ax1.set_yticks([])
-    # ax1.set_xlabel('x',color='white')
-    # ax1.set_ylabel('y',color='white')
-    # ax1.set_title('t',color='white')
-    # ax1.spines['left'].set_color('white')
-    # ax1.spines['right'].set_color('white')
-    # ax1.spines['bottom'].set_color('white')
-    # ax1.spines['top'].set_color('white')
     ax1.axis('off')
     fig.canvas.draw()
-    if (savefig):
+    if savefig:
         fig.savefig(filename, dpi=150, bbox_inches='tight', pad_inches=0)
     plt.pause(0.01)
 
@@ -196,16 +182,9 @@ def plot_people_according_to_exit_times(ifig, dt, people, domain, results,
         ax1.set_ylim(axis[2], axis[3])
     ax1.set_xticks([])
     ax1.set_yticks([])
-    # ax1.set_xlabel('x',color='white')
-    # ax1.set_ylabel('y',color='white')
-    # ax1.set_title('t',color='white')
-    # ax1.spines['left'].set_color('white')
-    # ax1.spines['right'].set_color('white')
-    # ax1.spines['bottom'].set_color('white')
-    # ax1.spines['top'].set_color('white')
     ax1.axis('off')
     fig.canvas.draw()
-    if (savefig):
+    if savefig:
         fig.savefig(filename, dpi=150, bbox_inches='tight', pad_inches=0)
     plt.pause(0.01)
 
@@ -281,16 +260,8 @@ def plot_people_paths(ifig, dt, pixel_size, people, domain, results, axis=None,
     ax1.set_xticks([])
     ax1.set_yticks([])
     ax1.axis('off')
-    # ax1.set_xlabel('x',color='white')
-    # ax1.set_ylabel('y',color='white')
-    # ax1.set_title('t',color='white')
-    # ax1.spines['left'].set_color('white')
-    # ax1.spines['right'].set_color('white')
-    # ax1.spines['bottom'].set_color('white')
-    # ax1.spines['top'].set_color('white')
-    # ax1.axis('off')
     fig.canvas.draw()
-    if (savefig):
+    if savefig:
         fig.savefig(filename, dpi=150, bbox_inches='tight', pad_inches=0)
 
 
@@ -330,8 +301,6 @@ def sequential_update(people, people_ij, weight, shuffle=None,
     height, width = people.shape
     if (randomstate is None):
         randomstate = np.random.RandomState()
-    # print("---------- sequential_update: shuffle = ",shuffle)
-    # Default: no shuffle update
     order = np.arange(Np)
     if (shuffle == 'random'):
         # Random shuffle update
@@ -343,7 +312,6 @@ def sequential_update(people, people_ij, weight, shuffle=None,
     for id in order:
         i = people_ij[id, 0]
         j = people_ij[id, 1]
-        # print("--------- sequential_update: id = ",id," i = ",i," j = ",j)
         if ((i != -1) and (j != -1)):
             II = [i]
             JJ = [j]
@@ -371,12 +339,10 @@ def sequential_update(people, people_ij, weight, shuffle=None,
             # print("--------- sequential_update: I = ",I," J = ", J," w = ",w)
 
             pos = randomstate.choice(len(II), 1, p=w)
-            # print("--------- sequential_update: pos = ",pos)
             people.data[i, j] = 0
             people.data[II[pos[0]], JJ[pos[0]]] = 1
             people_ij[id, 0] = II[pos[0]]
             people_ij[id, 1] = JJ[pos[0]]
-    # print("===> Move: people_ij = ",people_ij)
     return people, people_ij
 
 

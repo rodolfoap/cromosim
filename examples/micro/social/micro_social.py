@@ -1,3 +1,4 @@
+#!.venv/bin/python3
 # Authors:
 #     Sylvain Faure <sylvain.faure@universite-paris-saclay.fr>
 #     Bertrand Maury <bertrand.maury@universite-paris-saclay.fr>
@@ -35,7 +36,7 @@ opt, remainder = parser.parse_args()
 print("===> JSON filename = ", opt.jsonfilename)
 with open(opt.jsonfilename) as json_file:
     try:
-        input = json.load(json_file)
+        config = json.load(json_file)
     except json.JSONDecodeError as msg:
         print(msg)
         print("Failed to load json file ", opt.jsonfilename)
@@ -217,39 +218,39 @@ with open(opt.jsonfilename) as json_file:
         If true, people paths are drawn
 """
 
-prefix = input["prefix"]
+prefix = config["prefix"]
 if not os.path.exists(prefix):
     os.makedirs(prefix)
-seed = input["seed"]
-with_graphes = input["with_graphes"]
-json_domains = input["domains"]
+seed = config["seed"]
+with_graphes = config["with_graphes"]
+json_domains = config["domains"]
 # print("===> JSON data used to build the domains : ",json_domains)
-json_people_init = input["people_init"]
+json_people_init = config["people_init"]
 # print("===> JSON data used to create the groups : ",json_people_init)
-json_sensors = input["sensors"]
+json_sensors = config["sensors"]
 # print("===> JSON data used to create sensors : ",json_sensors)
-Tf = input["Tf"]
-dt = input["dt"]
-drawper = input["drawper"]
-mass = input["mass"]
-tau = input["tau"]
-F = input["F"]
-kappa = input["kappa"]
-delta = input["delta"]
-Fwall = input["Fwall"]
-lambda_ = input["lambda"]
-eta = input["eta"]
-projection_method = input["projection_method"]
-dmax = input["dmax"]
-dmin_people = input["dmin_people"]
-dmin_walls = input["dmin_walls"]
-plot_p = input["plot_people"]
-plot_c = input["plot_contacts"]
-plot_v = input["plot_velocities"]
-plot_vd = input["plot_desired_velocities"]
-plot_pa = input["plot_paths"]
-plot_s = input["plot_sensors"]
-plot_pa = input["plot_paths"]
+Tf = config["Tf"]
+dt = config["dt"]
+drawper = config["drawper"]
+mass = config["mass"]
+tau = config["tau"]
+F = config["F"]
+kappa = config["kappa"]
+delta = config["delta"]
+Fwall = config["Fwall"]
+lambda_ = config["lambda"]
+eta = config["eta"]
+projection_method = config["projection_method"]
+dmax = config["dmax"]
+dmin_people = config["dmin_people"]
+dmin_walls = config["dmin_walls"]
+plot_p = config["plot_people"]
+plot_c = config["plot_contacts"]
+plot_v = config["plot_velocities"]
+plot_vd = config["plot_desired_velocities"]
+plot_pa = config["plot_paths"]
+plot_s = config["plot_sensors"]
+plot_pa = config["plot_paths"]
 print("===> Final time, Tf = ", Tf)
 print("===> Time step, dt = ", dt)
 print("===> To draw the results each drawper iterations, \

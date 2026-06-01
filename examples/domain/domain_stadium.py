@@ -1,3 +1,4 @@
+#!.venv/bin/python3
 # Authors:
 #     Sylvain Faure <sylvain.faure@universite-paris-saclay.fr>
 #     Bertrand Maury <bertrand.maury@universite-paris-saclay.fr>

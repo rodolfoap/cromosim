@@ -142,4 +142,8 @@ dmypy.json
 # profiling data
 .prof
 
+# cromosim — generated domain images (produced by Domain.build_domain() in cwd)
+*_domain.png
+results/
+
 # End of https://www.toptal.com/developers/gitignore/api/python

@@ -144,10 +144,6 @@ def plot_compt(ifig, RoomNames, RoomCenters, DoorCenters, CircAngles, NPir,
             circles0.append(
                 Polygon(np.array([[xx0-s, yy0], [xx0+s, yy0], [xx1+s, yy1], [xx1-s, yy1]]), closed=True, fill=True))
             colors0.append(1.0)
-    # for line in Lines:
-    #     ##l: [xx0, yy0, xx1, yy1]
-    #     s = l[]
-    #     circles0.append(Polygon(np.array([[], []]), True)
 
     patches0 = PatchCollection(circles0,
                                cmap=matplotlib.cm.prism,

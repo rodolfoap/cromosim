@@ -74,6 +74,22 @@ def compute_contacts(dom, xyrv, dmax):
     return np.array(contacts)
 
 
+def _build_constraint_matrix(contacts, Nc, Np):
+    """Build the sparse constraint matrix B of shape (Nc, 2*Np) from contacts."""
+    II = contacts[:, 0].astype(int)
+    JJ = contacts[:, 1].astype(int)
+    Jpos = np.where(JJ >= 0)[0]
+    Jneg = np.where(JJ < 0)[0]
+    row = np.concatenate([Jpos, Jpos, Jpos, Jpos, Jneg, Jneg])
+    col = np.concatenate([2*II[Jpos], 2*II[Jpos]+1,
+                          2*JJ[Jpos], 2*JJ[Jpos]+1,
+                          2*II[Jneg], 2*II[Jneg]+1])
+    data = np.concatenate([contacts[Jpos, 3], contacts[Jpos, 4],
+                           -contacts[Jpos, 3], -contacts[Jpos, 4],
+                           -contacts[Jneg, 3], -contacts[Jneg, 4]])
+    return csr_matrix((data, (row, col)), shape=(Nc, 2*Np))
+
+
 def compute_forces(F, Fwall, xyrv, contacts, U, Vd, lambda_, delta, k, eta):
     """This function computes all the forces (isentropic interaction and
     friction) and sums them. The correcting pre-factor due to the vision
@@ -113,48 +129,69 @@ def compute_forces(F, Fwall, xyrv, contacts, U, Vd, lambda_, delta, k, eta):
         sum of all forces for each individual
     """
     Np = xyrv.shape[0]
-    Nc = contacts.shape[0]
     Forces = np.zeros((Np, 2))
-    # Social forces, friction,...
-    for ic in np.arange(Nc):
-        i = int(contacts[ic, 0])
-        j = int(contacts[ic, 1])
-        dij = contacts[ic, 2]
-        dij_moins = min(dij, 0.0)
-        eij_x = contacts[ic, 3]
-        eij_y = contacts[ic, 4]
-        if (j > -1):  # contact person/person
-            # Angular dependence
-            norm_Vdi = np.sqrt(Vd[i, 0]**2+Vd[i, 1]**2)
-            if (norm_Vdi > 0):
-                theta_ij = np.arccos((Vd[i, 0]*eij_x+Vd[i, 1]*eij_y)/norm_Vdi)
-                omega_ij = lambda_+(1-lambda_)*(1+np.cos(theta_ij))/2
-            else:
-                omega_ij = 1
-            norm_Vdj = np.sqrt(Vd[j, 0]**2+Vd[j, 1]**2)
-            if (norm_Vdj > 0):
-                theta_ji = np.arccos(-(Vd[j, 0]*eij_x+Vd[j, 1]*eij_y)/norm_Vdj)
-                omega_ji = lambda_+(1-lambda_)*(1+np.cos(theta_ji))/2
-            else:
-                omega_ji = 1
-            # Social force + force to handle overlapping
-            fij = -omega_ij*F*np.exp(-dij/delta) + k*dij_moins
-            fji = -omega_ji*F*np.exp(-dij/delta) + k*dij_moins
-            Forces[i, 0] += fij*eij_x
-            Forces[i, 1] += fij*eij_y
-            Forces[j, 0] -= fji*eij_x
-            Forces[j, 1] -= fji*eij_y
-            # Friction
-            fij_friction = eta*dij_moins*(-(U[i, 0]-U[j, 0])*eij_y +
-                                           (U[i, 1]-U[j, 1])*eij_x)
-            Forces[i, 0] -= fij_friction*eij_y
-            Forces[i, 1] += fij_friction*eij_x
-            Forces[j, 0] += fij_friction*eij_y
-            Forces[j, 1] -= fij_friction*eij_x
-        else:  # contact person/walls
-            fij = -Fwall*np.exp(-dij/delta) + k*dij_moins
-            Forces[i, 0] -= fij*eij_x
-            Forces[i, 1] -= fij*eij_y
+
+    if contacts.shape[0] == 0:
+        return Forces
+
+    II = contacts[:, 0].astype(int)
+    JJ = contacts[:, 1].astype(int)
+    dij = contacts[:, 2]
+    dij_moins = np.minimum(dij, 0.0)
+    eij_x = contacts[:, 3]
+    eij_y = contacts[:, 4]
+
+    # Person-person contacts (j >= 0)
+    pp = JJ >= 0
+    if pp.any():
+        I = II[pp]; J = JJ[pp]
+        d = dij[pp]; dm = dij_moins[pp]
+        ex = eij_x[pp]; ey = eij_y[pp]
+
+        Vdi = Vd[I]
+        norm_i = np.linalg.norm(Vdi, axis=1)
+        cos_ij = np.where(norm_i > 0,
+                          (Vdi[:, 0]*ex + Vdi[:, 1]*ey) / np.maximum(norm_i, 1e-12),
+                          0.0)
+        omega_ij = np.where(norm_i > 0,
+                            lambda_ + (1-lambda_)*(1 + np.cos(np.arccos(np.clip(cos_ij, -1.0, 1.0))))/2,
+                            1.0)
+
+        Vdj = Vd[J]
+        norm_j = np.linalg.norm(Vdj, axis=1)
+        cos_ji = np.where(norm_j > 0,
+                          -(Vdj[:, 0]*ex + Vdj[:, 1]*ey) / np.maximum(norm_j, 1e-12),
+                          0.0)
+        omega_ji = np.where(norm_j > 0,
+                            lambda_ + (1-lambda_)*(1 + np.cos(np.arccos(np.clip(cos_ji, -1.0, 1.0))))/2,
+                            1.0)
+
+        exp_term = np.exp(-d / delta)
+        fij = -omega_ij * F * exp_term + k * dm
+        fji = -omega_ji * F * exp_term + k * dm
+
+        np.add.at(Forces[:, 0], I,  fij * ex)
+        np.add.at(Forces[:, 1], I,  fij * ey)
+        np.add.at(Forces[:, 0], J, -fji * ex)
+        np.add.at(Forces[:, 1], J, -fji * ey)
+
+        dU_x = U[I, 0] - U[J, 0]
+        dU_y = U[I, 1] - U[J, 1]
+        f_fric = eta * dm * (-dU_x * ey + dU_y * ex)
+        np.add.at(Forces[:, 0], I, -f_fric * ey)
+        np.add.at(Forces[:, 1], I,  f_fric * ex)
+        np.add.at(Forces[:, 0], J,  f_fric * ey)
+        np.add.at(Forces[:, 1], J, -f_fric * ex)
+
+    # Wall contacts (j == -1)
+    wc = ~pp
+    if wc.any():
+        I = II[wc]; d = dij[wc]; dm = dij_moins[wc]
+        ex = eij_x[wc]; ey = eij_y[wc]
+        f_wall = -Fwall * np.exp(-d / delta) + k * dm
+        np.add.at(Forces[:, 0], I, -f_wall * ex)
+        np.add.at(Forces[:, 1], I, -f_wall * ey)
+
     return Forces
 
 
@@ -226,91 +263,72 @@ def projection(dt, xyrv, contacts, Vd, dmin_people=0, dmin_walls=0,
             ind_contacts_walls = np.where(contacts[:, 1] == -1)[0]
             DMIN = np.ones(contacts.shape[0])*dmin_people
             DMIN[ind_contacts_walls] = dmin_walls
-            Z = (contacts[:, 2]-DMIN)/dt  # ie Dij/dt
-            V[::2] = Vd[:, 0]  # A priori velocity
+            Z = (contacts[:, 2]-DMIN)/dt
+            V[::2] = Vd[:, 0]
             V[1::2] = Vd[:, 1]
             V = cvxopt.matrix(V)
             Z = cvxopt.matrix(Z, (Nc, 1))
             Id = cvxopt.spdiag([1]*(U.shape[0]))
-            if (Nc > 0):
-                II = contacts[:, 0].astype(int)
-                JJ = contacts[:, 1].astype(int)
-                Jpos = np.where(JJ >= 0)[0]
-                Jneg = np.where(JJ < 0)[0]
-                row = np.concatenate([Jpos, Jpos, Jpos, Jpos, Jneg, Jneg])
-                col = np.concatenate([2*II[Jpos], 2*II[Jpos]+1,
-                                      2*JJ[Jpos], 2*JJ[Jpos]+1,
-                                      2*II[Jneg], 2*II[Jneg]+1])
-                data = np.concatenate([contacts[Jpos, 3], contacts[Jpos, 4],
-                                       -contacts[Jpos, 3], -contacts[Jpos, 4],
-                                       -contacts[Jneg, 3], -contacts[Jneg, 4]])
-                B = csr_matrix((data, (row, col)), shape=(Nc, 2*Np))  # .toarray()
-                cvxoptB = cvxopt.spmatrix(np.array(data), np.array(row),
-                                          np.array(col), size=(Nc, 2*Np))
+            B = _build_constraint_matrix(contacts, Nc, Np)
+            II = contacts[:, 0].astype(int)
+            JJ = contacts[:, 1].astype(int)
+            Jpos = np.where(JJ >= 0)[0]
+            Jneg = np.where(JJ < 0)[0]
+            data = np.concatenate([contacts[Jpos, 3], contacts[Jpos, 4],
+                                   -contacts[Jpos, 3], -contacts[Jpos, 4],
+                                   -contacts[Jneg, 3], -contacts[Jneg, 4]])
+            row = np.concatenate([Jpos, Jpos, Jpos, Jpos, Jneg, Jneg])
+            col = np.concatenate([2*II[Jpos], 2*II[Jpos]+1,
+                                  2*JJ[Jpos], 2*JJ[Jpos]+1,
+                                  2*II[Jneg], 2*II[Jneg]+1])
+            cvxoptB = cvxopt.spmatrix(np.array(data), np.array(row),
+                                      np.array(col), size=(Nc, 2*Np))
+            if (method == "mosek"):
+                from mosek import iparam
+                cvxopt.solvers.options['mosek'] = {iparam.log: 0}
+                solution = cvxopt.solvers.qp(Id, -V, cvxoptB, Z, solver='mosek')
+            else:
+                solution = cvxopt.solvers.qp(Id, -V, cvxoptB, Z)
+                info = solution["iterations"]
+            if log:
+                C = Z - B@U
                 if (method == "mosek"):
-                    from mosek import iparam
-                    cvxopt.solvers.options['mosek'] = {iparam.log: 0}
-                    solution = cvxopt.solvers.qp(Id, -V, cvxoptB, Z, solver='mosek')
+                    print("    projection (mosek): nb of contacts = ", Nc,
+                          ", contrainte (Z-B@U).min() = ", C.min())
                 else:
-                    solution = cvxopt.solvers.qp(Id, -V, cvxoptB, Z)
-                    info = solution["iterations"]
+                    print("    projection (cvxopt): nb of contacts = ", Nc,
+                          ", nb of iterations = ", solution["iterations"],
+                          ", status = ", solution["status"],
+                          ", contrainte (Z-B@U).min() = ", C.min())
+            if (solution["status"] == "optimal"):
+                U = solution['x']
+            else:
+                print("    projection (mosek or cvxopt): optimization failed")
+                print("    ---> try with uzawa method...")
+                info = 0
+                L = np.zeros((Nc,))
+                R = 99*np.ones((Nc,))
+                U = np.zeros((2*Np,))
+                V = np.zeros((2*Np,))
+                D = contacts[:, 2]
+                V[::2] = Vd[:, 0]
+                V[1::2] = Vd[:, 1]
+                k = 0
+                while ((dt*R.max() > tol*2*xyrv[:, 2].min()) and (k < nb_iter_max)):
+                    U[:] = V[:] - B.transpose()@L[:]
+                    R[:] = B@U[:] - (D[:]-DMIN)/dt
+                    L[:] = np.maximum(L[:] + rho*R[:], 0)
+                    k += 1
                 if log:
-                    C = Z - B@U
-                    if (method == "mosek"):
-                        print("    projection (mosek): nb of contacts = ", Nc,
-                              ", contrainte (Z-B@U).min() = ", C.min())
-                    else:
-                        print("    projection (cvxopt): nb of contacts = ", Nc,
-                              ", nb of iterations = ", solution["iterations"],
-                              ", status = ", solution["status"],
-                              ", contrainte (Z-B@U).min() = ", C.min())
-                if (solution["status"] == "optimal"):
-                    U = solution['x']
+                    print("    projection (uzawa): nb of contacts = ", Nc,
+                          ", nb of iterations = ", k, ", min = ", R.min(),
+                          ", max = ", R.max(), ", tol = ", tol)
+                if (k == nb_iter_max):
+                    print("** WARNING: projection reached max iterations; "
+                          "unsatisfied constraints remain")
+                    info = -1
                 else:
-                    print("    projection (mosek or cvxopt): optimization failed")
-                    print("    ---> try with uzawa method...")
-                    info = 0
-                    II = contacts[:, 0].astype(int)
-                    JJ = contacts[:, 1].astype(int)
-                    Jpos = np.where(JJ >= 0)[0]
-                    Jneg = np.where(JJ < 0)[0]
-                    row = np.concatenate([Jpos, Jpos, Jpos, Jpos, Jneg, Jneg])
-                    col = np.concatenate([2*II[Jpos], 2*II[Jpos]+1,
-                                          2*JJ[Jpos], 2*JJ[Jpos]+1,
-                                          2*II[Jneg], 2*II[Jneg]+1])
-                    data = np.concatenate([contacts[Jpos, 3], contacts[Jpos, 4],
-                                           -contacts[Jpos, 3], -contacts[Jpos, 4],
-                                           -contacts[Jneg, 3], -contacts[Jneg, 4]])
-                    B = csr_matrix((data, (row, col)), shape=(Nc, 2*Np))
-                    L = np.zeros((Nc,))
-                    R = 99*np.ones((Nc,))
-                    U = np.zeros((2*Np,))
-                    V = np.zeros((2*Np,))
-                    D = contacts[:, 2]
-                    V[::2] = Vd[:, 0]
-                    V[1::2] = Vd[:, 1]
-                    k = 0
-                    ind_contacts_walls = np.where(contacts[:, 1] == -1)[0]
-                    DMIN = np.ones(contacts.shape[0])*dmin_people
-                    DMIN[ind_contacts_walls] = dmin_walls
-                    while ((dt*R.max() > tol*2*xyrv[:, 2].min()) and (k < nb_iter_max)):
-                        U[:] = V[:] - B.transpose()@L[:]
-                        R[:] = B@U[:] - (D[:]-DMIN)/dt
-                        L[:] = np.maximum(L[:] + rho*R[:], 0)
-                        k += 1
-                    if log:
-                        print("    projection (uzawa): nb of contacts = ", Nc,
-                              ", nb of iterations = ", k, ", min = ", R.min(),
-                              ", max = ", R.max(), ", tol = ", tol)
-                    if (k == nb_iter_max):
-                        print("** WARNING: Method projection **")
-                        print("** WARNING: you have reached the maximum number \
-                               of iterations,")
-                        print("** WARNING: it remains unsatisfied constraints \
-                               !! ")
-                        info = -1
-                    else:
-                        info = k
+                    info = k
 
             U = np.array(U).reshape((Np, 2))
 
@@ -321,14 +339,7 @@ def projection(dt, xyrv, contacts, Vd, dmin_people=0, dmin_walls=0,
             JJ = contacts[:, 1].astype(int)
             Jpos = np.where(JJ >= 0)[0]
             Jneg = np.where(JJ < 0)[0]
-            row = np.concatenate([Jpos, Jpos, Jpos, Jpos, Jneg, Jneg])
-            col = np.concatenate([2*II[Jpos], 2*II[Jpos]+1,
-                                  2*JJ[Jpos], 2*JJ[Jpos]+1,
-                                  2*II[Jneg], 2*II[Jneg]+1])
-            data = np.concatenate([contacts[Jpos, 3], contacts[Jpos, 4],
-                                   -contacts[Jpos, 3], -contacts[Jpos, 4],
-                                   -contacts[Jneg, 3], -contacts[Jneg, 4]])
-            B = csr_matrix((data, (row, col)), shape=(Nc, 2*Np))  # .toarray()
+            B = _build_constraint_matrix(contacts, Nc, Np)
             L = np.zeros((Nc,))
             R = 99*np.ones((Nc,))
             U = np.zeros((2*Np,))
@@ -735,6 +746,7 @@ def people_initialization(dom, groups, dt, dmin_people=0, dmin_walls=0,
     people["U"] = np.zeros((xyrv.shape[0], 2))
     people["Uold"] = np.zeros((xyrv.shape[0], 2))
     people["destinations"] = np.array(dest, dtype="U20")
+    people["gpid"] = gpid
     people["paths"] = {}
     people["rng"] = rng
     people["id"] = np.char.add([dom.name+'_']*xyrv.shape[0],
@@ -804,13 +816,12 @@ def find_duplicate_people(all_people, domains):
                 # print("people inside: ",inside,
                 #      " must be copy in domain ",next_domain_name)
                 for key in ["xyrv", "Vd", "U", "Uold"]:
-                    try:
+                    if virtual_people[next_domain_name][key] is None:
+                        virtual_people[next_domain_name][key] = all_people[name][key][inside]
+                    else:
                         virtual_people[next_domain_name][key] = np.concatenate((
                             virtual_people[next_domain_name][key],
                             all_people[name][key][inside]))
-                    except:
-                        virtual_people[next_domain_name][key] \
-                            = all_people[name][key][inside]
 
                 # To check if an individual appears two times...
                 if (inside.shape[0] > 0):
@@ -839,13 +850,12 @@ def find_duplicate_people(all_people, domains):
                 # print("people inside: ",inside,
                 #       " must be copy in domain ",name)
                 for key in ["xyrv", "Vd", "U", "Uold"]:
-                    try:
+                    if virtual_people[name][key] is None:
+                        virtual_people[name][key] = all_people[next_domain_name][key][inside]
+                    else:
                         virtual_people[name][key] = np.concatenate((
                             virtual_people[name][key],
                             all_people[next_domain_name][key][inside]))
-                    except:
-                        virtual_people[name][key] \
-                            = all_people[next_domain_name][key][inside]
 
                 # To check if an individual appears two times...
                 if (inside.shape[0] > 0):

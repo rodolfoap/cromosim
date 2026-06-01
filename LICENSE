@@ -1,25 +1,15 @@
-    CROMOSIM is a python package which contains the programs used in the
-    book "Crowds in Equations: An Introduction to the Microscopic Modeling
-    of Crowds", Advanced Textbooks In Mathematics, World Scientific Europe
-    Ltd (oct. 2018) written by B. Maury and S. Faure.
+CROMOSIM is a python package which contains the programs used in the book "Crowds in Equations: An Introduction to the Microscopic Modeling of Crowds", Advanced Textbooks In Mathematics, World Scientific Europe Ltd (oct. 2018) written by B. Maury and S. Faure.
 
-    Copyright (C) 2018  Sylvain Faure and Bertrand Maury
+Copyright (C) 2018  Sylvain Faure and Bertrand Maury
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    any later version.
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>
+You should have received a copy of the GNU General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>
 
-    Contacts :
-    sylvain.faure@math.u-psud.fr
-    bertrand.maury@math.u-psud.fr
-    Université Paris-Sud, Laboratoire de Mathématiques d'Orsay, Bât. 307
-    91 405 Orsay Cedex, France
+Contacts :
+sylvain.faure@math.u-psud.fr
+bertrand.maury@math.u-psud.fr
+Université Paris-Sud, Laboratoire de Mathématiques d'Orsay, Bât. 307
+91 405 Orsay Cedex, France
